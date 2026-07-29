@@ -513,8 +513,14 @@ function render(year) {
       <dt>平气类型</dt><dd><span class="harmony-tag" style="background:${a.ping_qi_type==='非平气年'?'#666':'#5cb85c'}22;color:${a.ping_qi_type==='非平气年'?'#666':'#5cb85c'};border:1px solid ${a.ping_qi_type==='非平气年'?'#666':'#5cb85c'}44">${a.ping_qi_type}</span></dd>
     </dl>
   `;
-  document.getElementById('climate-body').innerHTML = `<ul class="analysis-list">${a.climate_tendencies.map(t=>`<li>${t}</li>`).join('')}</ul>`;
-  document.getElementById('disease-body').innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${a.disease_tendencies.map((t,i)=>`<div class="disease-box" style="background:${i%2===0?'#d9534f':'#f0ad4e'}15;border-color:${i%2===0?'#d9534f44':'#f0ad4e44'}">${t}</div>`).join('')}</div>`;
+  document.getElementById('climate-body').innerHTML = '<ul class="analysis-list">' +
+    a.climate_tendencies.map(function(t) { return '<li>' + t + '</li>'; }).join('') + '</ul>';
+  document.getElementById('disease-body').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+    a.disease_tendencies.map(function(t, i) {
+      var bg = i % 2 === 0 ? '#d9534f15' : '#f0ad4e15';
+      var bc = i % 2 === 0 ? '#d9534f44' : '#f0ad4e44';
+      return '<div class="disease-box" style="background:' + bg + ';border-color:' + bc + '">' + t + '</div>';
+    }).join('') + '</div>';
 
   document.getElementById('loading').style.display = 'none';
   document.getElementById('content').style.display = 'block';
@@ -529,9 +535,19 @@ function mkYunTable(list) {
 }
 
 function mkQiTable(list, showRole) {
-  let h = '<table><thead><tr><th>步位</th><th>六气</th><th>五行</th><th>节气</th>${showRole?'<th>角色</th>':''}<th>日期</th></tr></thead><tbody>';
+  let h = '<table><thead><tr><th>步位</th><th>六气</th><th>五行</th><th>节气</th>';
+  if (showRole) h += '<th>角色</th>';
+  h += '<th>日期</th></tr></thead><tbody>';
   list.forEach(r => {
-    h += `<tr><td>${r.name}</td><td>${qiTag(r.qi)}</td><td>${elemTag(r.wuxing)}</td><td>${r.solar_term_range}</td>${showRole?`<td>${r.role||'—'}</td>`:''}<td>${r.date_range||''}</td></tr>`;
+    var roleCell = showRole ? '<td>' + (r.role || '—') + '</td>' : '';
+    h += '<tr>' +
+      '<td>' + r.name + '</td>' +
+      '<td>' + qiTag(r.qi) + '</td>' +
+      '<td>' + elemTag(r.wuxing) + '</td>' +
+      '<td>' + r.solar_term_range + '</td>' +
+      roleCell +
+      '<td>' + (r.date_range || '') + '</td>' +
+      '</tr>';
   });
   return h + '</tbody></table>';
 }
