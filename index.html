@@ -305,8 +305,14 @@ footer span { opacity: .6; }
       </div>
       <div class="grid-1" style="margin-top:16px">
         <div class="card">
-          <div class="card-header">⚠ 疾病倾向</div>
+          <div class="card-header">⚠ 疾病倾向与养生</div>
           <div class="card-body" id="disease-body"></div>
+        </div>
+      </div>
+      <div class="grid-1" style="margin-top:16px">
+        <div class="card">
+          <div class="card-header">🌿 用药参考</div>
+          <div class="card-body" id="medication-body"></div>
         </div>
       </div>
     </div>
@@ -448,23 +454,165 @@ function calcJiaLin(zqList, kqList) {
 function calcAnalysis(data) {
   const yi = data.yearInfo, zy = data.zhongYun, stzq = data.siTianZaiQuan;
   const ye = zy.element, ste = stzq.si_tian_wx;
-  let rel = '', detail = '';
-  if (ye === ste) { rel='同气'; detail='运气相同，气化专一'; }
+  const gan = yi.gan, zhi = yi.zhi;
+  let rel = '', detail = '', fullDesc = '';
+  if (ye === ste) { rel='同气'; detail='运气相同，气化专一'; fullDesc='岁运与司天之气相同，相互帮助，气化作用专一而强烈。'; }
   else {
     const k1=ye+ste, k2=ste+ye;
-    if (SHENG_KE[k1]==='生') { rel='运生气'; detail='运为生气，司天为承制'; }
-    else if (SHENG_KE[k2]==='生') { rel='气生运'; detail='司天为生气，运被生'; }
-    else if (SHENG_KE[k1]==='克') { rel='运克气'; detail='运为克，司天为被克，运盛'; }
-    else if (SHENG_KE[k2]==='克') { rel='气克运'; detail='司天克运，气盛'; }
+    if (SHENG_KE[k1]==='生') { rel='运生气'; detail='运为生气，司天为承制'; fullDesc='岁运生司天之气，运为主、气为从。气化以运为主，司天被动接受。'; }
+    else if (SHENG_KE[k2]==='生') { rel='气生运'; detail='司天为生气，运被生'; fullDesc='司天之气生岁运，气为主、运为从。气化以司天为主导，运受其生。'; }
+    else if (SHENG_KE[k1]==='克') { rel='运克气'; detail='运为克，司天为被克，运盛'; fullDesc='岁运克制司天之气，运强势而司天弱势。全年气化以运为主导。'; }
+    else if (SHENG_KE[k2]==='克') { rel='气克运'; detail='司天克运，气盛'; fullDesc='司天之气克制岁运，气强势而运弱势。全年气化以司天为主导。'; }
   }
+
+  // ── 中运分析 ──
+  const zfxs = [];
+  const wxs = ['木','火','土','金','水'];
+  const wi = wxs.indexOf(ye);
+  const shengZhe = wxs[(wi+3)%5]; // 生我者
+  const keZhe = wxs[(wi+1)%5];    // 克我者
+  const shengZhi = wxs[(wi+4)%5]; // 我生者
+  const keZhi = wxs[(wi+2)%5];    // 我克者
+  if (zy.tai_bu === '太过') {
+    zfxs.push('本气偏盛，'+WU_XING_WU_QI[ye]+'气过强，应有意防范'+shengZhe+'系统受影响');
+    zfxs.push(keZhi+'系统受乘，注意'+WU_XING_YUN_BING[keZhi].split('（')[0]+'相关症状');
+    zfxs.push('所胜之气被郁，待郁发时可能有异常气候变化');
+  } else {
+    zfxs.push('本气偏弱，'+WU_XING_WU_QI[ye]+'气不足，需注意'+WU_XING_YUN_BING[ye].split('（')[0]+'的调养');
+    zfxs.push(keZhe+'之气来乘，'+WU_XING_YUN_BING[keZhe].split('（')[0]+'问题可能增多');
+    zfxs.push('相侮之气来复，气候变化可能较为剧烈');
+  }
+
+  // ── 六气分步分析 ──
+  const stepAnalysis = data.jiaLin.map(function(j, idx) {
+    var zq = data.zhuQi[idx];
+    var kq = data.keQi[idx];
+    var dateInfo = zq.date_range;
+    var solarInfo = zq.solar_term_range;
+    var levelDesc = {
+      '顺':'气候正常，气化协调，病症较少',
+      '不顺': '气候略有异常，气化欠协调，需注意调整',
+      '逆': '气候反常，气化逆乱，易发较重病症',
+    };
+    var levelAdvice = {
+      '顺': '顺应季节变化正常生活即可',
+      '不顺': '注意天气变化，适时增减衣物，饮食温和',
+      '逆': '加强养生保健，避免极端天气出行，适当药物预防',
+    };
+    var organInfo = '';
+    if (kq.wuxing === '木') organInfo = '肝、胆、筋、目';
+    else if (kq.wuxing === '火') organInfo = '心、小肠、脉、舌';
+    else if (kq.wuxing === '土') organInfo = '脾、胃、肉、口';
+    else if (kq.wuxing === '金') organInfo = '肺、大肠、皮、鼻';
+    else if (kq.wuxing === '水') organInfo = '肾、膀胱、骨、耳';
+
+    return {
+      name: j.name,
+      date_range: dateInfo,
+      solar: solarInfo,
+      ke_qi: kq.qi,
+      zhu_qi: zq.qi,
+      harmony_level: j.harmony_level,
+      harmony: j.harmony,
+      desc: levelDesc[j.harmony_level] || '',
+      advice: levelAdvice[j.harmony_level] || '',
+      organ: organInfo,
+    };
+  });
+
+  // ── 客主加临整体判断 ──
+  var shunCount = 0, niCount = 0, pushunCount = 0;
+  data.jiaLin.forEach(function(j) {
+    if (j.harmony_level === '顺') shunCount++;
+    else if (j.harmony_level === '逆') niCount++;
+    else pushunCount++;
+  });
+  var zongti = '';
+  if (shunCount >= 4) zongti = '全年气化总体协调，气候较为正常。' + (niCount>0 ? '但'+niCount+'步存在逆象，需关注对应时段。' : '');
+  else if (niCount >= 3) zongti = '全年气化逆象较多，气候多变，需加强疾病预防。';
+  else if (pushunCount >= 3) zongti = '部分时段客主不顺，气候略显异常，需灵活应对。';
+  else zongti = '气化基本正常，个别时段需留意气候变化。';
+
+  // ── 气候分步展开 ──
   const climate = [];
-  climate.push('全年中运为'+zy.tai_bu+'之'+ye+'，'+WU_XING_WU_QI[ye]+'气偏'+zy.tai_bu);
-  climate.push('上半年司天'+stzq.si_tian+'主政');
-  climate.push('下半年在泉'+stzq.zai_quan+'主政');
+  climate.push('全年中运为'+zy.tai_bu+'之'+ye+'，'+WU_XING_WU_QI[ye]+'气偏'+zy.tai_bu+'，'+fullDesc);
+  climate.push('上半年司天'+stzq.si_tian+'主政，'+WU_XING_WU_QI[ste]+'气偏盛，影响'+({'木':'肝胆','火':'心','土':'脾胃','金':'肺','水':'肾'})[ste]+'系统');
+  climate.push('下半年在泉'+stzq.zai_quan+'主政，'+WU_XING_WU_QI[stzq.zai_quan_wx]+'气偏盛');
+  climate.push(zongti);
+  var shunEmoji = '✅', niEmoji = '⚠️', pushunEmoji = '◐';
+  stepAnalysis.forEach(function(s) {
+    var emoji = s.harmony_level === '顺' ? shunEmoji : (s.harmony_level === '逆' ? niEmoji : pushunEmoji);
+    climate.push(emoji+' '+s.name+'（'+s.date_range+'）：客'+s.ke_qi+'加临主'+s.zhu_qi+'，'+s.harmony+'。'+s.desc);
+  });
+
+  // ── 疾病倾向 ──
   const disease = [];
-  disease.push('中运'+ye+'偏'+zy.tai_bu+'，易致'+WU_XING_YUN_BING[ye]);
-  disease.push(zy.tai_bu==='太过' ? '太过之年，本气胜，所不胜之气来复' : '不及之年，本气弱，胜气乘之');
-  return { yun_qi_relation: rel, yun_qi_detail: detail, ping_qi_type: ye===ste?'同岁会':'非平气年', climate_tendencies: climate, disease_tendencies: disease };
+  disease.push({
+    title: '核心病机',
+    content: '中运'+ye+'偏'+zy.tai_bu+'，易致'+WU_XING_YUN_BING[ye]+'。'+(zy.tai_bu==='太过' ? '本气过胜，所不胜之气来复，须防标本转化。' : '本气不足，胜气乘之，须防兼夹为病。'),
+  });
+  var organMain = ({'木':'肝胆','火':'心和小肠','土':'脾胃','金':'肺和大肠','水':'肾和膀胱'})[ye] || ye;
+  disease.push({
+    title: '重点脏腑',
+    content: '全年应重点关注'+organMain+'系统。'+(ste !== ye ? '上半年辅以'+({'木':'肝胆','火':'心','土':'脾胃','金':'肺','水':'肾'})[ste]+'的调护。' : ''),
+  });
+  if (niCount > 0) {
+    disease.push({
+      title: '逆象时段',
+      content: '客主加临呈逆象的时段（共'+niCount+'步），气化逆乱，需特别注意其所属脏腑的预防。',
+    });
+  }
+  disease.push({
+    title: '养生总则',
+    content: ({'木':'疏肝理气、调畅情志，多食绿色蔬菜，适量运动。','火':'清心安神、养阴降火，多食红色食物，避免辛辣。','土':'健脾祛湿、和中养胃，多食黄色谷物，饮食有节。','金':'润肺生津、养阴防燥，多食白色食物，注意保湿。','水':'温补肾阳、固本培元，多食黑色食物，注意保暖。'})[ye] || '顺应四时，调和阴阳。',
+  });
+
+  stepAnalysis.forEach(function(s) {
+    var emoji = s.harmony_level === '顺' ? '✅' : (s.harmony_level === '逆' ? '⚠️' : '◐');
+    disease.push({
+      title: emoji+' '+s.name+'养生',
+      content: s.advice + (s.organ ? ' 关注：'+s.organ : ''),
+    });
+  });
+
+  // ── 用药参考 ──
+  var medRef = [];
+  var medMap = {
+    '木': '疏肝理气类（柴胡、白芍、香附、郁金）',
+    '火': '清热泻火类（黄连、黄芩、栀子、丹皮）',
+    '土': '健脾祛湿类（白术、茯苓、薏苡仁、苍术）',
+    '金': '润肺养阴类（沙参、麦冬、百合、川贝）',
+    '水': '温阳补肾类（附子、肉桂、熟地、山茱萸）',
+  };
+  var medKe = {
+    '木': '平肝潜阳类（天麻、钩藤、石决明、牡蛎）',
+    '火': '养心安神类（酸枣仁、柏子仁、远志、合欢皮）',
+    '土': '理气和胃类（陈皮、砂仁、厚朴、木香）',
+    '金': '宣肺化痰类（麻黄、杏仁、桔梗、前胡）',
+    '水': '利水渗湿类（茯苓、泽泻、车前子、猪苓）',
+  };
+  if (zy.tai_bu === '太过') {
+    medRef.push('岁运太过，宜泻'+ye+'之实：'+medMap[ye]);
+    medRef.push('防'+keZhi+'被乘：'+medKe[keZhi]);
+    medRef.push('扶'+shengZhe+'以防传变：'+(medMap[shengZhe] || '调养'));
+
+  } else {
+    medRef.push('岁运不及，宜补'+ye+'之虚：'+medMap[ye]);
+    medRef.push('防'+keZhe+'之乘：'+medKe[keZhe]);
+    medRef.push('助'+shengZhi+'以资化源：'+(medMap[shengZhi] || '调养'));
+  }
+  medRef.push('司天'+stzq.si_tian+'之治：'+(medMap[ste] || '随证治之'));
+
+  return {
+    yun_qi_relation: rel, yun_qi_detail: detail, ping_qi_type: ye===ste?'同岁会':'非平气年',
+    full_desc: fullDesc,
+    zhongyun_analysis: zfxs,
+    stepAnalysis: stepAnalysis,
+    zongti: zongti,
+    shunCount: shunCount, niCount: niCount, pushunCount: pushunCount,
+    climate_tendencies: climate, disease_tendencies: disease,
+    medication_ref: medRef,
+  };
 }
 
 function calcWuYunLiuQi(year) {
@@ -556,19 +704,25 @@ function render(year) {
   const a = data.analysis;
   document.getElementById('yunqi-body').innerHTML = `
     <dl class="desc-grid">
-      <dt>关系</dt><dd><span class="harmony-tag" style="background:#4a9eff22;color:#4a9eff;border:1px solid #4a9eff44">${a.yun_qi_relation}</span></dd>
-      <dt>详解</dt><dd>${a.yun_qi_detail}</dd>
+      <dt>关系</dt><dd><span class="harmony-tag" style="background:#4a9eff22;color:#4a9eff;border:1px solid #4a9eff44">${a.yun_qi_relation}</span> <span style="color:var(--text-secondary);font-size:12px">${a.yun_qi_detail}</span></dd>
       <dt>平气类型</dt><dd><span class="harmony-tag" style="background:${a.ping_qi_type==='非平气年'?'#666':'#5cb85c'}22;color:${a.ping_qi_type==='非平气年'?'#666':'#5cb85c'};border:1px solid ${a.ping_qi_type==='非平气年'?'#666':'#5cb85c'}44">${a.ping_qi_type}</span></dd>
     </dl>
+    <div style="margin-top:10px;padding:10px 12px;background:rgba(201,168,124,.08);border-radius:8px;font-size:13px;line-height:1.6;color:var(--accent-dim)">${a.full_desc}</div>
+    <div style="margin-top:12px"><strong style="color:var(--text-secondary);font-size:12px">中运深入分析</strong></div>
+    <ul class="analysis-list">${a.zhongyun_analysis.map(function(t){return '<li>'+t+'</li>';}).join('')}</ul>
+    <div style="margin-top:12px"><strong style="color:var(--text-secondary);font-size:12px">客主加临综判</strong><br><span style="font-size:13px;color:var(--text)">✅顺${a.shunCount}步 ◐不顺${a.pushunCount}步 ⚠️逆${a.niCount}步 — ${a.zongti}</span></div>
   `;
   document.getElementById('climate-body').innerHTML = '<ul class="analysis-list">' +
     a.climate_tendencies.map(function(t) { return '<li>' + t + '</li>'; }).join('') + '</ul>';
-  document.getElementById('disease-body').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-    a.disease_tendencies.map(function(t, i) {
-      var bg = i % 2 === 0 ? '#d9534f15' : '#f0ad4e15';
-      var bc = i % 2 === 0 ? '#d9534f44' : '#f0ad4e44';
-      return '<div class="disease-box" style="background:' + bg + ';border-color:' + bc + '">' + t + '</div>';
-    }).join('') + '</div>';
+  document.getElementById('disease-body').innerHTML = a.disease_tendencies.map(function(d, i) {
+    var bg = ['#d9534f15','#f0ad4e15','#4a9eff15','#5cb85c15','#e67e2215','#c9a87c15','#1677ff15','#722ed115'][i % 8];
+    var bc = ['#d9534f44','#f0ad4e44','#4a9eff44','#5cb85c44','#e67e2244','#c9a87c44','#1677ff44','#722ed144'][i % 8];
+    return '<div class="disease-box" style="background:' + bg + ';border-color:' + bc + ';margin-bottom:8px"><strong style="font-size:12px;color:var(--accent)">' + d.title + '</strong><br><span style="font-size:13px">' + d.content + '</span></div>';
+  }).join('');
+
+  // 用药参考（新卡片）
+  document.getElementById('medication-body').innerHTML = '<ul class="analysis-list">' +
+    a.medication_ref.map(function(m) { return '<li>' + m + '</li>'; }).join('') + '</ul>';
 
   document.getElementById('loading').style.display = 'none';
   document.getElementById('content').style.display = 'block';
