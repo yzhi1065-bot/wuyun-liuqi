@@ -624,7 +624,7 @@ function calcWuYunLiuQi(year) {
   const zhuQi = calcZhuQi();
   const keQi = calcKeQi(yi);
   const jiaLin = calcJiaLin(zhuQi, keQi);
-  const analysis = calcAnalysis({ yearInfo: yi, zhongYun: zy, siTianZaiQuan: stzq });
+  const analysis = calcAnalysis({ yearInfo: yi, zhongYun: zy, siTianZaiQuan: stzq, zhuQi: zhuQi, keQi: keQi, jiaLin: jiaLin });
   return { yearInfo: yi, zhongYun: zy, zhuYun, keYun, siTianZaiQuan: stzq, zhuQi, keQi, jiaLin, analysis };
 }
 
