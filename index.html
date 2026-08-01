@@ -376,6 +376,9 @@ const LIU_QI_NAMES = ['一之气','二之气','三之气','四之气','五之气
 
 const SHENG_KE = { '木土':'克','木火':'生','火土':'生','火金':'克','土金':'生','土水':'克','金水':'生','金木':'克','水木':'生','水火':'克' };
 
+// 地支五行（岁会判定用）
+const DI_ZHI_WUXING = {'子':'水','丑':'土','寅':'木','卯':'木','辰':'土','巳':'火','午':'火','未':'土','申':'金','酉':'金','戌':'土','亥':'水'};
+
 function getYearInfo(year) {
   const gi = (((year-4)%10)+10)%10, zi = (((year-4)%12)+12)%12;
   const gan = TIAN_GAN[gi], zhi = DI_ZHI[zi];
@@ -469,22 +472,22 @@ function calcAnalysis(data) {
     else if (SHENG_KE[k2]==='克') { rel='气克运'; detail='司天克运，气盛'; fullDesc='司天之气克制岁运，气强势而运弱势。全年气化以司天为主导。'; }
   }
 
-  // ── 中运分析 ──
+  // ── 中运分析（依《素问·五运行大论》"气有余则制己所胜而侮所不胜，其不及则己所不胜侮而乘之，己所胜轻而侮之"）──
   const zfxs = [];
   const wxs = ['木','火','土','金','水'];
   const wi = wxs.indexOf(ye);
   const shengZhe = wxs[(wi+4)%5]; // 生我者（相生序前一位）
-  const keZhe = wxs[(wi+3)%5];    // 克我者（相生序隔二位）
+  const keZhe = wxs[(wi+3)%5];    // 克我者 = 所不胜（相生序隔二位）
   const shengZhi = wxs[(wi+1)%5]; // 我生者（相生序后一位）
-  const keZhi = wxs[(wi+2)%5];    // 我克者（相生序隔一位）
+  const keZhi = wxs[(wi+2)%5];    // 我克者 = 所胜（相生序隔一位）
   if (zy.tai_bu === '太过') {
-    zfxs.push('本气偏盛，'+WU_XING_WU_QI[ye]+'气过强，应有意防范'+shengZhe+'系统受影响');
-    zfxs.push(keZhi+'系统受乘，注意'+WU_XING_YUN_BING[keZhi].split('（')[0]+'相关症状');
-    zfxs.push('所胜之气被郁，待郁发时可能有异常气候变化');
+    zfxs.push('本气偏胜，制己所胜——'+keZhi+'（所胜）受乘，注意'+WU_XING_YUN_BING[keZhi].split('（')[0].replace('疾病','')+'相关病症');
+    zfxs.push('侮己所不胜——'+keZhe+'（所不胜）受侮，其气来复时气候波动、'+WU_XING_YUN_BING[keZhe].split('（')[0].replace('疾病','')+'易发');
+    zfxs.push('所胜之气被郁，郁极乃发，季节交替时须防急骤气候变化');
   } else {
-    zfxs.push('本气偏弱，'+WU_XING_WU_QI[ye]+'气不足，需注意'+WU_XING_YUN_BING[ye].split('（')[0]+'的调养');
-    zfxs.push(keZhe+'之气来乘，'+WU_XING_YUN_BING[keZhe].split('（')[0]+'问题可能增多');
-    zfxs.push('相侮之气来复，气候变化可能较为剧烈');
+    zfxs.push('本气不足，己所不胜——'+keZhe+'（克我者）侮而乘之，注意'+WU_XING_YUN_BING[keZhe].split('（')[0].replace('疾病','')+'相关病症');
+    zfxs.push('己所胜——'+keZhi+'（我克者）轻而侮之，'+WU_XING_YUN_BING[keZhi].split('（')[0].replace('疾病','')+'亦需留意');
+    zfxs.push('本气偏弱，全年气化不及，调养以补益'+WU_XING_YUN_BING[ye].split('（')[0].replace('疾病','')+'为本');
   }
 
   // ── 六气分步分析 ──
@@ -607,9 +610,30 @@ function calcAnalysis(data) {
   }
   medRef.push('司天'+stzq.si_tian+'之治：'+(medMap[ste] || '随证治之'));
 
+  // ── 平气类型判定（天符/岁会/同天符/同岁会）──
+  // 天符：岁运与司天同气；岁会：岁运与岁支五行同气；太乙天符：两者兼
+  // 同天符：太过之年岁运与在泉同气；同岁会：不及之年岁运与在泉同气
   var pingQiType = '非平气年';
-  if (ye === ste) pingQiType = '天符（岁运与司天同气）';
-  else if (ye === stzq.zai_quan_wx) pingQiType = '同岁会（岁运与在泉同气）';
+  var zhiWx = DI_ZHI_WUXING[yi.zhi] || '';
+  var isTaiFu = (ye === ste);
+  var isSuiHui = (ye === zhiWx);
+  var isTongTianFu = (zy.tai_bu === '太过' && ye === stzq.zai_quan_wx);
+  var isTongSuiHui = (zy.tai_bu === '不及' && ye === stzq.zai_quan_wx);
+  var pingTags = [];
+  if (isTaiFu && isSuiHui) pingTags.push('太乙天符');
+  else {
+    if (isTaiFu) pingTags.push('天符');
+    if (isSuiHui) pingTags.push('岁会');
+  }
+  if (isTongTianFu) pingTags.push('同天符');
+  if (isTongSuiHui) pingTags.push('同岁会');
+  if (pingTags.length) pingQiType = pingTags.join('兼');
+  if (pingQiType === '天符') pingQiType = '天符（岁运与司天同气）';
+  else if (pingQiType === '岁会') pingQiType = '岁会（岁运与岁支同气）';
+  else if (pingQiType === '太乙天符') pingQiType = '太乙天符（天符兼岁会）';
+  else if (pingQiType === '同天符') pingQiType = '同天符（太过之年岁运与在泉同气）';
+  else if (pingQiType === '同岁会') pingQiType = '同岁会（不及之年岁运与在泉同气）';
+  else if (pingQiType.includes('兼')) pingQiType = pingQiType + '（岁运与岁支及在泉同气）';
 
   return {
     yun_qi_relation: rel, yun_qi_detail: detail, ping_qi_type: pingQiType,
