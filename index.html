@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>五运六气排盘 · 独立版</title>
 <meta name="description" content="基于年干支推演五运六气 — 中运、主客运、司天在泉、主客气及客主加临在线查询">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☯</text></svg>">
 <style>
 /* ── Reset & base ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -156,7 +157,7 @@ header p { color: var(--text-secondary); margin-top: 8px; font-size: 14px; }
   font-size: 13px; font-weight: 600; color: var(--text-secondary);
   display: flex; align-items: center; gap: 8px;
 }
-.card-body { padding: 16px; }
+.card-body { padding: 16px; overflow-x: auto; }
 
 /* ── Tables ── */
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -376,9 +377,12 @@ const LIU_QI_NAMES = ['一之气','二之气','三之气','四之气','五之气
 const SHENG_KE = { '木土':'克','木火':'生','火土':'生','火金':'克','土金':'生','土水':'克','金水':'生','金木':'克','水木':'生','水火':'克' };
 
 function getYearInfo(year) {
-  const gi = (year-4)%10, zi = (year-4)%12;
+  const gi = (((year-4)%10)+10)%10, zi = (((year-4)%12)+12)%12;
   const gan = TIAN_GAN[gi], zhi = DI_ZHI[zi];
-  return { year, gan, zhi, ganzhi: gan+zhi, shengxiao: SHENG_XIAO[zi], liushi: gi*6+zi+1, yinyang: TIAN_GAN_YIN_YANG[gan] };
+  // 六十甲子序：干支同奇偶配对，序 = (gi + 10*(((gi-zi)/2)%6)) % 60 + 1
+  const half = ((gi - zi) / 2);
+  const liushi = ((gi + 10 * ((half % 6 + 6) % 6)) % 60) + 1;
+  return { year, gan, zhi, ganzhi: gan+zhi, shengxiao: SHENG_XIAO[zi], liushi, yinyang: TIAN_GAN_YIN_YANG[gan] };
 }
 
 function calcZhongYun(yi) {
@@ -445,7 +449,7 @@ function calcJiaLin(zqList, kqList) {
       const key = kw+zw, key2 = zw+kw;
       if (SHENG_KE[key] === '生') { harmony = '客生主（顺）'; level = '顺'; }
       else if (SHENG_KE[key2] === '生') { harmony = '主生客（顺）'; level = '顺'; }
-      else if (SHENG_KE[key] === '克') { harmony = '客克主（不顺）'; level = '不顺'; }
+      else if (SHENG_KE[key] === '克') { harmony = '客克主（客胜为从）'; level = '顺'; }
       else if (SHENG_KE[key2] === '克') { harmony = '主克客（逆）'; level = '逆'; }
     }
     return { step: i+1, name: LIU_QI_NAMES[i], zhu_qi: zq.qi, ke_qi: kq.qi, zhu_wuxing: zw, ke_wuxing: kw, harmony, harmony_level: level };
@@ -455,7 +459,6 @@ function calcJiaLin(zqList, kqList) {
 function calcAnalysis(data) {
   const yi = data.yearInfo, zy = data.zhongYun, stzq = data.siTianZaiQuan;
   const ye = zy.element, ste = stzq.si_tian_wx;
-  const gan = yi.gan, zhi = yi.zhi;
   let rel = '', detail = '', fullDesc = '';
   if (ye === ste) { rel='同气'; detail='运气相同，气化专一'; fullDesc='岁运与司天之气相同，相互帮助，气化作用专一而强烈。'; }
   else {
@@ -470,10 +473,10 @@ function calcAnalysis(data) {
   const zfxs = [];
   const wxs = ['木','火','土','金','水'];
   const wi = wxs.indexOf(ye);
-  const shengZhe = wxs[(wi+3)%5]; // 生我者
-  const keZhe = wxs[(wi+1)%5];    // 克我者
-  const shengZhi = wxs[(wi+4)%5]; // 我生者
-  const keZhi = wxs[(wi+2)%5];    // 我克者
+  const shengZhe = wxs[(wi+4)%5]; // 生我者（相生序前一位）
+  const keZhe = wxs[(wi+3)%5];    // 克我者（相生序隔二位）
+  const shengZhi = wxs[(wi+1)%5]; // 我生者（相生序后一位）
+  const keZhi = wxs[(wi+2)%5];    // 我克者（相生序隔一位）
   if (zy.tai_bu === '太过') {
     zfxs.push('本气偏盛，'+WU_XING_WU_QI[ye]+'气过强，应有意防范'+shengZhe+'系统受影响');
     zfxs.push(keZhi+'系统受乘，注意'+WU_XING_YUN_BING[keZhi].split('（')[0]+'相关症状');
@@ -604,8 +607,12 @@ function calcAnalysis(data) {
   }
   medRef.push('司天'+stzq.si_tian+'之治：'+(medMap[ste] || '随证治之'));
 
+  var pingQiType = '非平气年';
+  if (ye === ste) pingQiType = '天符（岁运与司天同气）';
+  else if (ye === stzq.zai_quan_wx) pingQiType = '同岁会（岁运与在泉同气）';
+
   return {
-    yun_qi_relation: rel, yun_qi_detail: detail, ping_qi_type: ye===ste?'同岁会':'非平气年',
+    yun_qi_relation: rel, yun_qi_detail: detail, ping_qi_type: pingQiType,
     full_desc: fullDesc,
     zhongyun_analysis: zfxs,
     stepAnalysis: stepAnalysis,
@@ -794,7 +801,11 @@ function init() {
     tags.appendChild(tag);
   });
 
-  sel.addEventListener('change', () => selectYear(+sel.value));
+  sel.addEventListener('change', () => {
+    const y = parseInt(sel.value, 10);
+    if (isNaN(y)) return;
+    selectYear(y);
+  });
 
   // Tabs
   document.querySelectorAll('.tab').forEach(tab => {
